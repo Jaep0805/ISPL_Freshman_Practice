@@ -10,9 +10,9 @@ class Classifier(object):
         """ TODO: define your model (2 conv layers and 2 fc layers?)
         x: input image
         logit: network output w/o softmax """
-
+        
         model = tf.keras.models.Sequential()
-        model.add(tf.keras.Input(shape=(16,)))
+        model.add(tf.keras.Input(shape=(28,28,1)))
         model.add(tf.keras.layers.Conv2D(32, 3, 1, activation = 'relu', padding = "same"))
         model.add(tf.keras.layers.MaxPooling2D(2, 2))
         model.add(tf.keras.layers.Conv2D(64, 3, 1, activation = 'relu',  padding = "same"))
@@ -22,6 +22,10 @@ class Classifier(object):
         model.add(tf.keras.layers.Dense(10))
 
         with tf.variable_scope('model', reuse=reuse):
+            print("???????????????????????????????????")
+            print(x.shape)
+            x = tf.cast(x, tf.float32)
+
             logit = x
             # logit = tf.nn.conv2d(logit, [3, 3, 1, 32], 1, "SAME")
             # logit = tf.nn.max_pool(logit, 3, 2, "VALID")
@@ -30,6 +34,7 @@ class Classifier(object):
             # logit = tf.nn.Linear()
             # logit = model(logit)
             logit = model(logit)
+            print(logit.shape)
 
         return logit
 
@@ -50,18 +55,21 @@ class Classifier(object):
         tr_logit = self.build(tr_img)
         val_logit = self.build(val_img, True)
 
+        print("1")
         step = tf.Variable(0, trainable=False)
         increment_step = tf.assign_add(step, 1)
+        print("2")
 
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=tr_lab, logits=tr_logit))
         optimizer = tf.train.AdamOptimizer(self.args.lr).minimize(loss, global_step=step)
-
+        print("3")
         tr_accuracy = self.accuracy(tr_lab, tr_logit)
         val_accuracy = self.accuracy(val_lab, val_logit)
-
+        print("4")
         var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) + tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES)
         saver = tf.train.Saver(max_to_keep=2, var_list = var_list)
         # session
+        print("5")
         with tf.Session() as sess:
             if self.args.restore:
                 saver.restore(sess, tf.train.latest_checkpoint(self.args.ckptdir))
@@ -70,10 +78,14 @@ class Classifier(object):
 
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+            print("8")
 
             try:
+                print("9")
+
                 min_val_acc = 10000.
                 while not coord.should_stop():
+                    print("HI")
                     global_step = sess.run(step)
                     print(global_step)
                     batch_loss, batch_acc, _ = sess.run([loss, tr_accuracy, optimizer])
@@ -89,13 +101,13 @@ class Classifier(object):
                             print('model saved in file: %s' % save_path)
 
                     sess.run(increment_step)
-
             except KeyboardInterrupt:
                 print('keyboard interrupted')
                 coord.request_stop()
             except Exception as e:
                 coord.request_stop(e)
             finally:
+                print("10")
                 save_path = saver.save(sess, self.args.ckptdir+'/model.ckpt', global_step = step)
                 print('model saved in file : %s' % save_path)
                 coord.request_stop()
